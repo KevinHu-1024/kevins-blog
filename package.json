@@ -1,0 +1,19 @@
+{
+  "name": "kevins-blog",
+  "version": "1.0.0",
+  "description": "技术博客",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KevinHu-1024/kevins-blog.git"
+  },
+  "author": "kevin",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/KevinHu-1024/kevins-blog/issues"
+  },
+  "homepage": "https://github.com/KevinHu-1024/kevins-blog#readme"
+}

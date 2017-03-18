@@ -5,8 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
   <title>Document</title>
+  <script src="https://unpkg.com/vue"></script>
 </head>
 <body>
-  Hello, World!
+  <div id="app">
+    <ul>
+      <li v-for="issue in issueList">
+        {{ issue.title }}
+        <span v-for="label in issue.labels">
+          <issue-label :text="label.name" :color="label.color"></issue-label>
+        </span>
+      </li>
+    </ul>
+  </div>
 </body>
+<script>
+  const app = new Vue({
+    el: '#app',
+    data: {
+      issueList: [],
+    },
+    mounted() {
+      var self = this;
+      fetch('https://api.github.com/repos/KevinHu-1024/kevins-blog/issues?access_token=2510bc886ce5fb70577583d4742bb1fbdb4edf55')
+        .then(res => res.json())
+        .then(json => self.issueList = json);
+    },
+  });
+
+  Vue.component('issue-label', {
+    props: ['text', 'color'],
+    template: `
+      <span v-bind:style="{ backgroundColor: '#' + color, borderRadius: '2px', padding: '2px', color: 'white' }">
+        {{ text }}
+      </span>
+    `
+  });
+</script>
 </html>

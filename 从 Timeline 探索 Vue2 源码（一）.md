@@ -14,6 +14,10 @@
 
 * 初始化：`$ vue init simple learn-vue-source`
 
-## 前言
+* 工具：
+
+  * **Chrome DevTool** 用来查看函数调用栈及断点调试
+  * **WebStorm** 用来在打包前的代码中搜索模块
+  * **lambda-view** 调试工具中的Source 面板没有语法高亮，用它来实现更好的源码阅读体验
 
 ## 场景一

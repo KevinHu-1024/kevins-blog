@@ -5,8 +5,149 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
   <title>Document</title>
+  <script src="https://unpkg.com/vue"></script>
+  <!--<script src="https://unpkg.com/vue-router/dist/vue-router.js"></script>-->
 </head>
 <body>
-  Hello, World!
+  <div id="app">
+    <label-view :labels="labels" :handle-label-click="handleLabelClick"></label-view>
+    <list-view
+      :issue-list="listData"
+      :handle-label-click="handleLabelClick"
+    ></list-view>
+    <pager
+      @last="handleLastPageClick"
+      @next="handleNextPageClick"
+    ></pager>
+  </div>
 </body>
+<script>
+  const GITHUB = 'https://api.github.com';
+  const USER = 'youngwind';
+  const REPO = 'blog';
+
+  Vue.component('issue-label', {
+    props: ['text', 'color'],
+    methods: {
+      handleClick() {
+        this.$emit('labelClick', this.text);
+      }
+    },
+    template: `
+      <span
+        v-bind:style="{ backgroundColor: '#' + color, borderRadius: '2px', padding: '0 2px', color: 'white', margin: '0 2px', fontSize: '12px', cursor: 'pointer' }"
+        @click="handleClick"
+      >
+        {{ text }}
+      </span>
+    `
+  });
+
+  Vue.component('list-view', {
+    props: ['issueList', 'handleLabelClick'],
+    template: `
+      <ul>
+        <li v-for="issue in issueList">
+          {{ issue.title }}
+          <span v-for="label in issue.labels">
+            <issue-label
+              :text="label.name"
+              :color="label.color"
+              @labelClick="handleLabelClick"
+            ></issue-label>
+          </span>
+        </li>
+      </ul>
+    `
+  });
+
+  Vue.component('pager', {
+    methods: {
+      lastPage() {
+        this.$emit('last');
+      },
+      nextPage() {
+        this.$emit('next');
+      }
+    },
+    template: `
+      <div>
+        <span @click="lastPage">上一页</span>
+        <span @click="nextPage">下一页</span>
+      </div>
+    `
+  });
+
+  Vue.component('label-view', {
+    props: ['labels', 'handleLabelClick'],
+    template: `
+      <div>
+        <h4>标签</h4>
+        <p>
+          <issue-label v-for="label in labels" :text="label.name" :color="label.color" :key="label.id" @labelClick="handleLabelClick"></issue-label>
+        </p>
+      </div>
+    `
+  });
+  
+  const app = new Vue({
+    el: '#app',
+    data: {
+      listData: [],
+      currentPage: 1,
+      labels: [],
+    },
+    methods: {
+      getIssues(page = 1, labels = []) {
+        return fetch(`${GITHUB}/repos/${USER}/${REPO}/issues?page=${page}&labels=${labels.join(',')}`)
+      },
+      getLabels() {
+        return fetch(`${GITHUB}/repos/${USER}/${REPO}/labels`)
+      },
+      handleLastPageClick() {
+        console.log('last', this.currentPage);
+        if (this.currentPage <= 1) return;
+        var self = this;
+        this.getIssues(this.currentPage - 1)
+          .then(res => res.json())
+          .then(json => {
+            self.currentPage --;
+            self.listData = json;
+          })
+          .catch(err => {
+            console.log(err);
+          });
+      },
+      handleNextPageClick() {
+        console.log('next', this.currentPage);
+        var self = this;
+        this.getIssues(this.currentPage + 1)
+          .then(res => res.json())
+          .then(json => {
+            self.currentPage ++;
+            self.listData = json;
+          })
+          .catch(err => {
+            console.log(err);
+          })
+      },
+      handleLabelClick(labelId) {
+        console.log('outer');
+        var self = this;
+        this.getIssues(1, [labelId])
+          .then(res => res.json())
+          .then(json => self.listData = json)
+      }
+    },
+    mounted() {
+      var self = this;
+      this.getIssues(1)
+        .then(res => res.json())
+        .then(json => self.listData = json);
+      this.getLabels()
+        .then(res => res.json())
+        .then(json => self.labels = json);
+    },
+  });
+</script>
 </html>

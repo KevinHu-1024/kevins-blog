@@ -68,6 +68,8 @@ ParseHTML和EvaluateScript是浏览器自身的行为，解析HTML和JS，重点
 
 ![callstack](./imgs/vue-source-1/callstack.png)
 
+### 构造函数
+
 明白了调用栈，我们就看一下我们应用的启动过程吧！从我们的代码上来看，我们先是用`new Vue(xxx)`生成的一个 Vue 的实例，毫无疑问会调用 Vue 的构造函数，在 Timeline 上点击 Vue$3 ，在下面的 Summary 面板上通过点击代码行，我们能够跳转到 Source 面板查看源码。
 
 ![newvue](./imgs/vue-source-1/newvue.png)
@@ -80,6 +82,7 @@ ParseHTML和EvaluateScript是浏览器自身的行为，解析HTML和JS，重点
 
 ![$instance](./imgs/vue-source-1/$instance.png)
 
+### 初始化函数 _init
 从函数上我们看到，构造函数调用了实例上面的_init方法，这时实例还没有创建，哪里来的_init方法呢？一定是沿着原型链找到了实例公共方法上面去了，即调用的是Vue.proptotype._init()
 
 沿着这个线索，我们在Source窗口中command+F搜索（windows用户使用xxx+F）.init，于是我们在3661行找到了它的初始定义：
@@ -106,6 +109,8 @@ ParseHTML和EvaluateScript是浏览器自身的行为，解析HTML和JS，重点
 ![init-in-source](./imgs/vue-source-1/init-in-source.png)
 
 前面的if判断似乎是，判断实例是否是一个组件，如果不是组件的话（是根实例），就执行mergeOptions。（在Source中搜索_isComponent，确实搜到了`createComponentInstanceForVnode`方法，与创建实例有关。从注释上看似乎是由于merge操作缓慢，而组件实例又没有必要做这步操作，所以有了这有么一个判断）
+
+### 选项合并与格式化 mergeOptions
 
 我们打上断点看看mergeOptions做了些什么：
 
@@ -192,7 +197,9 @@ function mergeOptions (
 }
 ```
 
-我们刚才一连跳过了5个函数，跳过是因为我们既没有子组件、也没扩展构造器、也没使用混入、也没自定义指令及props，这也就解答了我们在Timeline上为何只看到了mergeFields一个函数执行的原因，Timeline忠实地为我们记录了一切。**这也是使用Timeline查看源码的好处：跳过在当前场景无用的函数，专注于对整个框架运行的理解，同时也能减少读源码的压力。**
+> 我们刚才一连跳过了5个函数，跳过是因为我们既没有子组件、也没扩展构造器、也没使用混入、也没自定义指令及props，这也就解答了我们在Timeline上为何只看到了mergeFields一个函数执行的原因，Timeline忠实地为我们记录了一切。**这也是使用Timeline查看源码的好处：跳过在当前场景无用的函数，专注于对整个框架运行的理解，同时也能减少读源码的压力。**
+
+### 策略模式与闭包
 
 接下来就是看看这唯一执行的 mergeField做了什么吧：
 
@@ -214,18 +221,95 @@ merge之前：
 
 然后问题来了：我们的 `message` 哪去了？
 
-这就是策略搞的鬼，合并`data`字段的处理策略在*994行*，在我们的场景下，代码走了*1028行*的分支，策略执行完直接返回了一个函数，我们的`message`在策略执行的函数的闭包中被保存了下来，`option.data`的这个函数将在后续处理中被调用。
+这就是策略搞的鬼，合并`data`字段的处理策略在*994行*，在我们的场景下，代码走了*1028行*的分支，策略执行完直接返回了一个`mergedInstanceDataFn`函数，我们的`message`在策略执行的函数的闭包中被保存了下来，`option.data`现在是一个函数，它将在后续处理中被调用。
 
 ![data-func](./imgs/vue-source-1/data-func.png)
 
-回到initMixin，看看我们运行到哪里了：
+### 向实例上挂载 render
 
-为何 initLifeCycle 等没有显示在 timeline 中呢？
+根据 Timeline，`mergeoptions` 运行之后，接下来就是 `initRender` 部分了：
 
-根据 timeline，mergeoptions 结束之后，我们跳过那些没有执行的代码，就到了 initRender 的部分了：
+这里Vue实例挂载了两个createElement函数，`vm._c` 和 `vm.$createElement`，其中按照Vue的编程代码风格，带`_`都是内部方法，`$`都是外部方法。
 
-我们继续往下看：
+```javascript
+  ...
+  // 用来支持slot
+  vm.$slots = resolveSlots(vm.$options._renderChildren, renderContext);
+  // 用来支持带作用域的slot
+  vm.$scopedSlots = emptyObject;
+  // 把createElement函数绑定在vm自身上
+  // 参数列表: tag, data, children, normalizationType, alwaysNormalize
+  // 内部使用vm._c时，由于没有外来的干扰，不进行normalization过程，以提高性能，所以最后一个参数是false
+  vm._c = function (a, b, c, d) { return createElement(vm, a, b, c, d, false); };
+  // 当外部使用vm.$createElement时，则必须要对开发者输入的内容进行normalization过程，所以随后一个参数为true
+  vm.$createElement = function (a, b, c, d) { return createElement(vm, a, b, c, d, true); };
+```
 
+### beforeCreate 生命周期触发
+
+`initRender` 后便运行了 `callHook` 方法，来触发 `beforeCreate` 生命周期，如果 `vm.$options` 中包含了相应字段（如$options.mounted），则将函数this改成当前vm并运行之。
+
+此时，数据观测(data observer) 和 event/watcher 事件都还没有进行。
+
+### 谜一样的 callHook
+
+在 `callHook` 方法中，从代码上看似乎生命周期函数支持数组形式：
+
+```javascript
+  ...
+  var handlers = vm.$options[hook];
+  if (handlers) {
+    for (var i = 0, j = handlers.length; i < j; i++) {
+      try {
+        handlers[i].call(vm);
+      } catch (e) {
+        handleError(e, vm, (hook + " hook"));
+      }
+    }
+  }
+  ...
+```
+
+于是用下面的代码验证之：
+
+```javascript
+const app = new Vue({
+	el: '#app',
+  mounted: [
+  	function() {
+    	console.log(1);
+    },
+    function() {
+    	console.log(2);
+    },
+    () => {console.log(3)}
+  ]
+})
+
+// -> 1,2,3
+```
+
+这时又意识到，源码中的写法应该是**只支持**数组形式，这与我们平时的使用方式就不太一样了，我们平时使用基本都是直接一个函数，这时`.length`应该是0，函数不执行，那么Vue又使用了什么来把我传入函数放入数组的呢？
+
+通过打断点来确认，最后发现还是 `mergeFields` 中的策略捣的鬼，在 merge 生命周期函数时，统一在这里被转换为数组形式。代码在 `1048` 行，`mergeHook` 函数中。实现如下：
+
+```javascript
+/**
+ * Hooks and props are merged as arrays.
+ */
+function mergeHook (
+  parentVal,
+  childVal
+) {
+  return childVal
+    ? parentVal
+      ? parentVal.concat(childVal)
+      : Array.isArray(childVal)
+        ? childVal
+        : [childVal]
+    : parentVal
+}
+```
 
 
 我们在这里发现了 data 是 function 的情况（最开始就是 function），是怎么处理的：

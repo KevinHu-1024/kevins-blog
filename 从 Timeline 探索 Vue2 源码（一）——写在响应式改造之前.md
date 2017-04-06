@@ -8,9 +8,11 @@ React、Angular、Vue可以说是国内比较流行的三种 Web 框架
 
 > 来自[谷歌指数](https://trends.google.com/trends/explore?cat=31&date=today%2012-m&geo=CN&q=React,%2Fm%2F0j45p7w,Angular2,Vue)
 
-其中 Vue 作为后起之秀，以其易上手、低侵入等特点，受到了开发者们的青睐。社区中对 Vue 源码进行剖析的文章也是不少，比如 @XX 的200行代码实现精简版 Vue、老同事@少峰的 Vue 早期源码探索等文章，让笔者也是获益良多。于是按捺不住探索的欲望，也开始的读源码的过程。
+其中 Vue 作为后起之秀，以其易上手、低侵入等特点，受到了开发者们的青睐。社区中对 Vue 源码进行剖析的文章也是不少，比如 @xiaofuzi [200行代码实现精简版 Vue](https://github.com/xiaofuzi/deep-in-vue/blob/master/src/the-super-tiny-vue.js)、前同事 @youngwind 的 [Vue 早期源码探索](https://github.com/youngwind/blog/issues/84)等文章，让笔者也是获益良多。于是按捺不住探索的欲望，也开始的读源码的过程。
 
-当我打开 Vue 项目的时候我当然是**懵逼的**，完全不知道从哪里下手，硬着头皮读完了初始化函数，脑图记了一大片，却依然对整个框架没有整体概念，而面对更加复杂的后续源码，实在是没有驱动力继续读下去了。后来参考了少峰的 Vue 早期源码探索中新颖的源码阅读方式，我也试了一下，不过读来之后又是只知其味，不得其法，数据绑定更新的原理是知道了，但是依然对整个框架的运行过程云里雾里，继续看下去依然几千个 commit，又烂尾了。后来笔者注意到调试工具里面的 Timeline 工具，这个工具一般是用来分析前端性能的，我之前用它来调试过一切奇怪的 bug（比如 Vue2.1.17和2.1.18版本对动画处理的 bug），在阅读源码工作中，Timeline 能够图形化的显示调用栈，你能够很清晰的阅读在特定场景中，整个框架是如何运行的。在知道整体运行框架之后，再去阅读某个小模块的源码才能做到有的放矢，也能知道模块与模块之间的关系，所谓“场景驱动阅读”。你还能调整场景，看在另一个场景中，调用栈是不是改变了，为何而变，涉及到了什么知识点，目前看来是一种可取的阅读方案。
+开始阅读的时候，我当然是**懵逼的**，完全不知道从哪里下手，硬着头皮读完了初始化函数，脑图记了一大片，却依然对整个框架没有整体概念，而面对更加复杂的后续源码，实在是没有驱动力继续读下去了。后来参考了少峰的《 Vue 早期源码探索》系列中新颖的源码阅读方式，我也试了一下，不过读来之后又是只知其味，不得其法，数据绑定更新的原理是知道了，但是依然对整个框架的运行过程云里雾里，继续看下去依然几千个 commit，又包含若干 breakchange ，so 又烂尾了...
+
+后来笔者注意到调试工具里面的 Timeline 工具，这个工具一般是用来分析前端性能的，我之前也用它来调试过一些奇怪的 bug（比如 Vue 2.1.17和2.1.18版本对动画处理的不同），在阅读源码工作中，**Timeline 能够图形化的显示调用栈**，你能够很清晰的阅读在特定场景中，整个框架是如何运行的。在知道整体运行框架之后，再去阅读某个小模块的源码才能做到有的放矢，也能知道**模块与模块之间的关系**，所谓“场景驱动阅读”。你还能调整场景，看在**另一个场景中，调用栈是不是改变了，为何而变，涉及到了什么知识点**，目前看来是一种可取的阅读源码的方案。
 
 下面我们来实践一下。
 
@@ -58,13 +60,13 @@ const app = new Vue({
 
 ![overview](./imgs/vue-source-1/overview.png)
 
-前面一部分有几个匿名函数执行，通过我们的 html 我们可以知道，这里是 vue.js 释放的过程，即做一些环境判断、一些预处理、最后把 Vue 挂在到 window 的过程，最后红框内是我们打 log 的过程，这两个部分我们就不深究了。
+前面一部分有几个匿名函数执行，通过我们的 HTML 我们可以知道，这里是 vue.js 释放的过程，即做一些环境判断、一些预处理、最后把 Vue 挂载到 window 的过程，最后红框内是生成 Timeline 的过程，这两个部分我们就不深究了。
 
-ParseHTML和EvaluateScript是浏览器自身的行为，解析HTML和JS，重点关注中间的 vue 运行过程，放大中间部分，能够看到中间这大概20ms 的部分就是 vue 干活的时间了
+ParseHTML 和 EvaluateScript是浏览器自身的行为，解析 HTML 和 JS，重点关注中间的 Vue 的运行过程，放大中间部分，能够看到中间这大概20ms的部分就是 Vue 干活的时间了。
 
 ![process](./imgs/vue-source-1/process.png)
 
-图中绿色的部分是 vue.js运行时的调用栈，所谓调用栈通俗理解（我就不放学院派的定义了）就是函数调用的顺序，函数都是从顶层向下调用，调用到最下面之后，相邻的同级别的函数执行，继续从上向下调用，类似于下图的方式：
+图中绿色的部分是 vue.js 运行时的调用栈，所谓调用栈通俗理解（我就不放学院派的定义了）就是函数调用的顺序，函数都是从顶层向下调用，调用到最下面之后，相邻的同级别的函数执行，继续从上向下调用，类似于下图的方式：
 
 ![callstack](./imgs/vue-source-1/callstack.png)
 
@@ -83,7 +85,7 @@ ParseHTML和EvaluateScript是浏览器自身的行为，解析HTML和JS，重点
 ![$instance](./imgs/vue-source-1/$instance.png)
 
 ### 初始化函数 _init
-从函数上我们看到，构造函数调用了实例上面的_init方法，这时实例还没有创建，哪里来的_init方法呢？一定是沿着原型链找到了实例公共方法上面去了，即调用的是Vue.proptotype._init()
+从函数上我们看到，构造函数调用了实例上面的_init方法，这时实例还没有创建，哪里来的_init方法呢？一定是沿着原型链找到了实例公共方法上面去了，即调用的是Vue.proptotype._init()。
 
 沿着这个线索，我们在Source窗口中command+F搜索（windows用户使用xxx+F）.init，于是我们在3661行找到了它的初始定义：
 
@@ -116,7 +118,7 @@ ParseHTML和EvaluateScript是浏览器自身的行为，解析HTML和JS，重点
 
 ![break-merge](./imgs/vue-source-1/break-merge.png)
 
-mergeOptions传入了三个参数：Vue构造器的options（包括Vue的默认option，全局中使用Vue.config/mixin等等设置的选项）、我们new Vue时传入的options、当前vm实例。
+mergeOptions传入了三个参数：Vue构造器的options（包括Vue的默认option，全局中使用Vue.config/mixin等等设置的选项）、我们 `new Vue` 时传入的options、当前vm实例。
 
 通过点击源码位置，我们找到了`mergeOptions`的函数定义(编译之后的)，通过在各个函数（`checkComponents`, `normalizeProps`, `normalizeDirectives`）上打断点，我们大概理清楚了`mergeOptions`是做什么的：
 
@@ -314,7 +316,7 @@ function mergeHook (
   // 问题是：数组中的函数执行顺序，和触发机制，是由根vm统一按顺序触发吗？还是由各个子vm分别触发？
 }
 ```
-### 山雨欲来：initState 响应式改造
+### 山雨欲来：initState 拦截$options.data的存取
 
 ![init-state-time](./imgs/vue-source-1/init-state-time.png)
 
@@ -342,7 +344,7 @@ function mergeHook (
 
 ![proxy](./imgs/vue-source-1/proxy.png)
 
-拦截对$options.data中键值的访问，全部映射到`vm._data[对应键值上]`。
+这里拦截对$options.data中键值的访问，全部映射到`vm._data[对应键值上]`。
 
 proxy的实现如下：
 
@@ -360,7 +362,7 @@ function proxy (target, sourceKey, key) {
 }
 ```
 
-Vue 通过这里完成了内外数据存取的分离，当我们在操作$options.data时，Vue内部则在操作_data。举个例子：
-当我访问vm.message的时候返回vm._data.message，当我设置vm.message的时候，返回vm._data.message，这部分就是把 data 放到了实例上面，并配置存取方法，去存取vm._data，完成了内部属性_和外部实例属性 message 的连接。
+Vue 通过这里完成了内外数据存取的分离，当我们在操作`$options.data`时，Vue内部则在操作`_data`。举个例子：
+当我访问`vm.message`的时候返回`vm._data.message`，当我设置`vm.message`的时候，返回`vm._data.message`，完成了内部属性`_data.message`和外部属性`data.message`的连接。
 
-接下来就是重头戏：**对$options.data进行观察（observe）**，请待下期分解！
+接下来就是重头戏：[**对$options.data进行观察（observe）**](https://github.com/KevinHu-1024/kevins-blog/blob/draft/%E4%BB%8E%20Timeline%20%E6%8E%A2%E7%B4%A2%20Vue2%20%E6%BA%90%E7%A0%81%EF%BC%88%E4%BA%8C%EF%BC%89%E2%80%94%E2%80%94%E5%93%8D%E5%BA%94%E5%BC%8F%E6%94%B9%E9%80%A0.md)，请待下期分解！

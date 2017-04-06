@@ -1,4 +1,4 @@
-# x 个场景带你逛遍 Vue2 源码（一）
+# 从 Timeline 探索 Vue2 源码（一）——写在响应式改造之前
 
 ## 前言
 
@@ -225,6 +225,8 @@ merge之前：
 
 ![data-func](./imgs/vue-source-1/data-func.png)
 
+为了观察到后面的调用过程，我们在这个返回的函数中打一个断点（`1030`行）。
+
 ### 向实例上挂载 render
 
 根据 Timeline，`mergeoptions` 运行之后，接下来就是 `initRender` 部分了：
@@ -298,8 +300,8 @@ const app = new Vue({
  * Hooks and props are merged as arrays.
  */
 function mergeHook (
-  parentVal,
-  childVal
+  parentVal, // 以合并beforeCreate为例，这里是父级vm的befoCreate
+  childVal  // 这里是当前vm的befoCreate
 ) {
   return childVal
     ? parentVal
@@ -308,53 +310,57 @@ function mergeHook (
         ? childVal
         : [childVal]
     : parentVal
+  // 如果存在父子级关系，就把父子级的生命周期函数数组合并
+  // 问题是：数组中的函数执行顺序，和触发机制，是由根vm统一按顺序触发吗？还是由各个子vm分别触发？
+}
+```
+### 山雨欲来：initState 响应式改造
+
+![init-state-time](./imgs/vue-source-1/init-state-time.png)
+
+根据 Timeline 我们继续往下走，到了`initState`，`initState` 传入了当前的vm作为参数，我们先看一下当前vm的样子：
+
+![before-init-state](./imgs/vue-source-1/before-init-state.png)
+
+在当前场景下，`initState` 执行了 `initData`，这里 Vue 对数据进行了响应式改造，这里就接近 Vue 进行数据绑定的核心部分了。
+
+接下来把断点打在`2648`行，准备进入 `initData`。
+
+#### 函数形式的 $options.data
+
+在 `initData` 中，我们发现了 `$options.data` 是函数的情况（2704-2706），这个 `$options.data` 就是在 `mergeOptions` 函数中被返回的函数。
+
+![init-data](./imgs/vue-source-1/init-data.png)
+
+这个函数做了一次数据合并，问题是：为什么要做数据合并？为何要延迟到现在才合并？
+
+![merge-data](./imgs/vue-source-1/merge-data.png)
+
+合并之后的数据就变成了对象，返回出来。
+
+#### 拦截对$options.data中键值的存取
+
+![proxy](./imgs/vue-source-1/proxy.png)
+
+拦截对$options.data中键值的访问，全部映射到`vm._data[对应键值上]`。
+
+proxy的实现如下：
+
+```javascript
+function proxy (target, sourceKey, key) {
+  // 配置Object.defineProperty的第三参数，把访问都映射到_data[key]
+  sharedPropertyDefinition.get = function proxyGetter () {
+    return this[sourceKey][key]
+  };
+  // 配置Object.defineProperty的第三参数，把写入都映射到_data[key]
+  sharedPropertyDefinition.set = function proxySetter (val) {
+    this[sourceKey][key] = val;
+  };
+  Object.defineProperty(target, key, sharedPropertyDefinition);
 }
 ```
 
+Vue 通过这里完成了内外数据存取的分离，当我们在操作$options.data时，Vue内部则在操作_data。举个例子：
+当我访问vm.message的时候返回vm._data.message，当我设置vm.message的时候，返回vm._data.message，这部分就是把 data 放到了实例上面，并配置存取方法，去存取vm._data，完成了内部属性_和外部实例属性 message 的连接。
 
-我们在这里发现了 data 是 function 的情况（最开始就是 function），是怎么处理的：
-
-
-另一个发现是$options.data在 mergeOptions 之后是一个函数，这个函数是根据 data 的 strategy merge 上去的，在$options.data执行之后，data 会被合并，合并之后的结果返回
-
-
-
-
-再接下来发现了 proxy 方法及共享的 defineProperty 配置：
-
-
-proxy(target, sourceKey, key) 的作用是为 sourceKey 配置 Object.defineProperty,  当我访问vm.message的时候返回vm._data.message，当我设置vm.message的时候，返回vm._data.message，可配置且可枚举，这部分就是把 data 放到了实例上面，并配置存取方法，去存取vm._data，完成了内部属性_和外部实例属性 message 的连接。
-
-然后就进入到了 Vue 最吸引人的方法，observe方法中啦：
-
-
-
-我们发现了 Observer 的类：
-
-
-继续往下看：
-
-顺手我们学到了如何判断对象：
-
-
-然后是怎么走 walk 实现递归观察。
-
-然后 initState 就走完了。
-
-根据 Timeline，我们继续来看编译部分：
-
-我们又遇到了这种写法：
-
-![env-ignore](./imgs/vue-source-1/env-ignore.png)
-
-笔者开始也很奇怪为何会有这种写法，最后通过在编辑器中对打包前的源码进行搜索才明白，这部分是根据env环境不同选择性生成代码的结果，就是源码中这一段：
-
-![env-gen-2](./imgs/vue-source-1/env-gen-2.png)
-
-在开发环境中Vue尽可能增加了warning，error的提醒，而在生产环境中，他们都是不需要的，所以通过这种机制来处理。
-
-可能有读者在这里就奇怪了，mergeOptions中明明有很多函数执行，为何timeline上只显示了一个呢？
-我们在调用栈上也只看到了少量函数执行。
-
-
-我们稍后就为大家揭晓答案。
+接下来就是重头戏：**对$options.data进行观察（observe）**，请待下期分解！

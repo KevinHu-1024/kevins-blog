@@ -4,7 +4,7 @@
 
 React、Angular、Vue可以说是国内比较流行的三种 Web 框架
 
-![trends](./imgs/vue-source-1/trends.png)
+![trends](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/trends.png)
 
 > 来自[谷歌指数](https://trends.google.com/trends/explore?cat=31&date=today%2012-m&geo=CN&q=React,%2Fm%2F0j45p7w,Angular2,Vue)
 
@@ -54,61 +54,61 @@ const app = new Vue({
 
 首先设置你的 Timeline 如下，这样方便你通过截图来判断，程序开始时间（当然你也可以通过下面的资源占用情况来判断）
 
-![setup](./imgs/vue-source-1/setup.png)
+![setup](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/setup.png)
 
 刷新页面，等一会我们就能看见生成好的 Timeline 了。
 
-![overview](./imgs/vue-source-1/overview.png)
+![overview](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/overview.png)
 
 前面一部分有几个匿名函数执行，通过我们的 HTML 我们可以知道，这里是 vue.js 释放的过程，即做一些环境判断、一些预处理、最后把 Vue 挂载到 window 的过程，最后红框内是生成 Timeline 的过程，这两个部分我们就不深究了。
 
 ParseHTML 和 EvaluateScript是浏览器自身的行为，解析 HTML 和 JS，重点关注中间的 Vue 的运行过程，放大中间部分，能够看到中间这大概20ms的部分就是 Vue 干活的时间了。
 
-![process](./imgs/vue-source-1/process.png)
+![process](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/process.png)
 
 图中绿色的部分是 vue.js 运行时的调用栈，所谓调用栈通俗理解（我就不放学院派的定义了）就是函数调用的顺序，函数都是从顶层向下调用，调用到最下面之后，相邻的同级别的函数执行，继续从上向下调用，类似于下图的方式：
 
-![callstack](./imgs/vue-source-1/callstack.png)
+![callstack](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/callstack.png)
 
 ### 构造函数
 
 明白了调用栈，我们就看一下我们应用的启动过程吧！从我们的代码上来看，我们先是用`new Vue(xxx)`生成的一个 Vue 的实例，毫无疑问会调用 Vue 的构造函数，在 Timeline 上点击 Vue$3 ，在下面的 Summary 面板上通过点击代码行，我们能够跳转到 Source 面板查看源码。
 
-![newvue](./imgs/vue-source-1/newvue.png)
+![newvue](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/newvue.png)
 
 这就是我们的构造函数的真面目:
 
-![constructor](./imgs/vue-source-1/constructor.png)
+![constructor](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/constructor.png)
 
 （至于为什么是Vue$3，在这里我还不太明白，可能是不同编译 target 导致的不同吧（从编译后的源码看，runtime 版本的是$2），不过从log出的实例和 `window.Vue`上来看，Vue$3确实是我们的实例。）
 
-![$instance](./imgs/vue-source-1/$instance.png)
+![$instance](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/$instance.png)
 
 ### 初始化函数 _init
 从函数上我们看到，构造函数调用了实例上面的_init方法，这时实例还没有创建，哪里来的_init方法呢？一定是沿着原型链找到了实例公共方法上面去了，即调用的是Vue.proptotype._init()。
 
 沿着这个线索，我们在Source窗口中command+F搜索（windows用户使用xxx+F）.init，于是我们在3661行找到了它的初始定义：
 
-![search-init](./imgs/vue-source-1/search-init.png)
+![search-init](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/search-init.png)
 
 我们发现，Vue.proptotype._init()是定义在一个initMixin函数中的，这个函数又是从哪里运行的呢？继续搜索initMixin：
 
-![init-mixin](./imgs/vue-source-1/initmixin.png)
+![init-mixin](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/initmixin.png)
 
 在构造函数下方，我们看到了他的身影，顺便我们还看到了`stateMixin`、`eventsMixin`、`lifecycleMixin`、`renderMixin`这几个函数调用，从命名上面看，他们分别初始化了**状态相关**、**事件相关**、**生命周期相关**、**渲染相关**的东西。他们都发生在匿名函数执行时，在我们使用Vue类时，他们已经初始化完成了，所以我们先往后面看，待需要的时候回头来看匿名函数都做了什么。
 
 我们继续来看Timeline：
 
-![init-all](./imgs/vue-source-1/init-all.png)
+![init-all](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/init-all.png)
 
 从Timeline上我们看到Vue._init一共做了这么几件事情：
 `mergeOptions`、`initRender`、`initState`，然后就是一个长长的 `Vue$3.$mount` 直到视图渲染完成。
 
 在Timeline点击Vue._init，然后在下面Summy面板中点击源码位置，进入Source面板：
 
-![enter-init](./imgs/vue-source-1/enter-init.png)
+![enter-init](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/enter-init.png)
 
-![init-in-source](./imgs/vue-source-1/init-in-source.png)
+![init-in-source](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/init-in-source.png)
 
 前面的if判断似乎是，判断实例是否是一个组件，如果不是组件的话（是根实例），就执行mergeOptions。（在Source中搜索_isComponent，确实搜到了`createComponentInstanceForVnode`方法，与创建实例有关。从注释上看似乎是由于merge操作缓慢，而组件实例又没有必要做这步操作，所以有了这有么一个判断）
 
@@ -116,7 +116,7 @@ ParseHTML 和 EvaluateScript是浏览器自身的行为，解析 HTML 和 JS，�
 
 我们打上断点看看mergeOptions做了些什么：
 
-![break-merge](./imgs/vue-source-1/break-merge.png)
+![break-merge](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/break-merge.png)
 
 mergeOptions传入了三个参数：Vue构造器的options（包括Vue的默认option，全局中使用Vue.config/mixin等等设置的选项）、我们 `new Vue` 时传入的options、当前vm实例。
 
@@ -215,17 +215,17 @@ mergeOptions传入了三个参数：`parent`:Vue构造器的options、`child`:�
 
 merge之前：
 
-![merge-before](./imgs/vue-source-1/merge-before.png)
+![merge-before](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/merge-before.png)
 
 之后：
 
-![merge-res](./imgs/vue-source-1/merge-res.png)
+![merge-res](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/merge-res.png)
 
 然后问题来了：我们的 `message` 哪去了？
 
 这就是策略搞的鬼，合并`data`字段的处理策略在*994行*，在我们的场景下，代码走了*1028行*的分支，策略执行完直接返回了一个`mergedInstanceDataFn`函数，我们的`message`在策略执行的函数的闭包中被保存了下来，`option.data`现在是一个函数，它将在后续处理中被调用。
 
-![data-func](./imgs/vue-source-1/data-func.png)
+![data-func](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/data-func.png)
 
 为了观察到后面的调用过程，我们在这个返回的函数中打一个断点（`1030`行）。
 
@@ -318,11 +318,11 @@ function mergeHook (
 ```
 ### 山雨欲来：initState 拦截$options.data的存取
 
-![init-state-time](./imgs/vue-source-1/init-state-time.png)
+![init-state-time](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/init-state-time.png)
 
 根据 Timeline 我们继续往下走，到了`initState`，`initState` 传入了当前的vm作为参数，我们先看一下当前vm的样子：
 
-![before-init-state](./imgs/vue-source-1/before-init-state.png)
+![before-init-state](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/before-init-state.png)
 
 在当前场景下，`initState` 执行了 `initData`，这里 Vue 对数据进行了响应式改造，这里就接近 Vue 进行数据绑定的核心部分了。
 
@@ -332,17 +332,17 @@ function mergeHook (
 
 在 `initData` 中，我们发现了 `$options.data` 是函数的情况（2704-2706），这个 `$options.data` 就是在 `mergeOptions` 函数中被返回的函数。
 
-![init-data](./imgs/vue-source-1/init-data.png)
+![init-data](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/init-data.png)
 
 这个函数做了一次数据合并，问题是：为什么要做数据合并？为何要延迟到现在才合并？
 
-![merge-data](./imgs/vue-source-1/merge-data.png)
+![merge-data](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/merge-data.png)
 
 合并之后的数据就变成了对象，返回出来。
 
 #### 拦截对$options.data中键值的存取
 
-![proxy](./imgs/vue-source-1/proxy.png)
+![proxy](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/proxy.png)
 
 这里拦截对$options.data中键值的访问，全部映射到`vm._data[对应键值上]`。
 

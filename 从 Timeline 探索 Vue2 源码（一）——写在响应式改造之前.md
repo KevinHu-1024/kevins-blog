@@ -365,4 +365,4 @@ function proxy (target, sourceKey, key) {
 Vue 通过这里完成了内外数据存取的分离，当我们在操作`$options.data`时，Vue内部则在操作`_data`。举个例子：
 当我访问`vm.message`的时候返回`vm._data.message`，当我设置`vm.message`的时候，返回`vm._data.message`，完成了内部属性`_data.message`和外部属性`data.message`的连接。
 
-接下来就是重头戏：[**对$options.data进行观察（observe）**](https://github.com/KevinHu-1024/kevins-blog/issues/5)，请待下期分解！
+接下来就是重头戏：**对$options.data进行观察（observe）** #5，请待下期分解！

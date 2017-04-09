@@ -74,8 +74,66 @@
 
   // 测试
   ```
-3. 
+3. 按照源码的风格封装了一下：
+
+  ```javascript
+  var a = {
+    name: 'kevin',
+    age: 0,
+    location: {
+      province: 'bj',
+      detail: {
+        district: 'haidian',
+      }
+    }
+  };
+
+  class Observer {
+    constructor(data) {
+      this.data = data;
+
+      if (Observer.isObject(data)) {
+        this.walk(data);
+      } else {
+        console.error(`${Object.prototype.toString.call(data)} 不是对象`);
+      }
+    }
+
+    static isObject(value) {
+      return Object.prototype.toString.call(value) === '[object Object]'
+    }
+
+    walk(obj) {
+      for (var key in obj) {
+        if (obj.hasOwnProperty(key)) {
+          var item = obj[key];
+          if (Observer.isObject(item)) {
+            new Observer(item);
+          } else {
+            this.reactive(obj, key, item); // 对每一个不是对象的键，生成一个闭包，闭包不会被销毁
+          }
+        }
+      }
+    }
+
+    reactive(obj, key, val) {
+      Object.defineProperty(obj, key, {
+        get: function() {
+          console.log(`访问${key}`);
+          return val;  // get的时候访问闭包中的val
+        },
+        set: function(newVal) {
+          console.log(`写入${key}:${newVal}`);
+          val = newVal;  // set的时候修改闭包中的val
+        }
+      });
+    }
+  }
+
+  new Observer(a);
+  ```
+![reactive-ppt](./imgs/vue-source-1/reactive-ppt.png)
+
 ## 改造
 ## 变更触发
-## 依赖收集
 ## 一个 Watch 工具库

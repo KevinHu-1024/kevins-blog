@@ -340,11 +340,11 @@ function mergeHook (
 
 合并之后的数据就变成了对象，返回出来。
 
-#### 拦截对$options.data中键值的存取
+#### 拦截对$options.props中键值的存取
 
 ![proxy](https://github.com/KevinHu-1024/kevins-blog/raw/draft/imgs/vue-source-1/proxy.png)
 
-这里拦截对$options.data中键值的访问，全部映射到`vm._data[对应键值上]`。
+这里拦截对$options.props中键值的访问，全部映射到`vm._data[对应键值上]`。
 
 proxy的实现如下：
 
@@ -362,7 +362,7 @@ function proxy (target, sourceKey, key) {
 }
 ```
 
-Vue 通过这里完成了内外数据存取的分离，当我们在操作`$options.data`时，Vue内部则在操作`_data`。举个例子：
+Vue 通过这里完成了内外数据存取的分离，当我们在操作`$options.props.xx`时，Vue内部则在操作`_data.xx`。举个例子：
 当我访问`vm.message`的时候返回`vm._data.message`，当我设置`vm.message`的时候，返回`vm._data.message`，完成了内部属性`_data.message`和外部属性`data.message`的连接。
 
 接下来就是重头戏：**对$options.data进行观察（observe）** #5，请待下期分解！
